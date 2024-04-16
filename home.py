@@ -1,0 +1,66 @@
+import streamlit as st
+import pandas as pd
+import joblib
+import torch
+import transformers
+
+new_model = joblib.load(r'C:\Users\LENOVO\Downloads\joblib_bert_model_comp_9.joblib')
+
+def detect_hate_speech(text):
+    tokenizer = transformers.BertTokenizer.from_pretrained('bert-base-uncased')
+    tokens = tokenizer(text, return_tensors='pt', padding=True, truncation=True)
+
+    with torch.no_grad():
+        logits = new_model(**tokens)[0]
+        probabilities = torch.softmax(logits, dim=-1)
+        probabilities = probabilities.cpu().numpy()[0]
+    return probabilities
+
+def app():
+    st.markdown("## 🚫 Hate Speech Detection App")
+
+    st.markdown("## 🏠 Home")
+    st.write("Welcome to the Home Page!")
+    st.write("Please select 'Terms and Conditions' from the sidebar to view the terms.")
+
+    input_option = st.radio("Select Input Option:", ["Enter Text", "Upload CSV File"])
+
+    if input_option == "Enter Text":
+        user_text = st.text_area("Enter text here:")
+
+        if st.button("Detect Hate Speech"):
+            prediction = detect_hate_speech(user_text)
+
+            # Display results
+            st.subheader("Detection Results:")
+            st.write("Category Probabilities:")
+            st.write(prediction)
+
+            # Define the meanings of each category
+            categories_meaning = {
+                0: "Explicit hate speech or derogatory language",
+                1: "Subtle hate speech or biased language",
+                2: "Text not explicitly hateful but may contain insensitive or offensive language"
+            }
+
+            # Display meanings of categories
+            for category, probability in enumerate(prediction):
+                st.write(f"Category {category}: {categories_meaning[category]} - Probability: {probability:.4f}")
+
+            st.bar_chart(prediction)
+
+    elif input_option == "Upload CSV File":
+        uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
+
+        if uploaded_file is not None:
+            df = pd.read_csv(uploaded_file)
+
+            detection_results = df["Text"].apply(detect_hate_speech)
+
+            st.subheader("Detection Results:")
+            for idx, prediction in enumerate(detection_results):
+                st.write(f"Row {idx + 1}:")
+                st.write("Category Probabilities:")
+                st.write(prediction)
+
+                st.bar_chart(prediction)
